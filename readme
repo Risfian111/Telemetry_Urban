@@ -1,96 +1,548 @@
-# 🏎️ MOTORSPORT TELEMETRY SYSTEM
-### ESP32-Based Real-Time Racing Dashboard
+# ⚡ SEM Driveline Optimizer
 
-![Version](https://img.shields.io/badge/version-2.0-red)
-![ESP32](https://img.shields.io/badge/platform-ESP32-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+> **Shell Eco-marathon Intelligent Driveline Optimization System**
+> Combines telemetry analysis, system identification, genetic algorithms, and graph-based path planning to minimize energy consumption per kilometer.
 
----
+<div align="center">
 
-## 📋 DAFTAR ISI
-1. [Tentang Proyek](#tentang-proyek)
-2. [Fitur](#fitur)
-3. [Hardware yang Dibutuhkan](#hardware-yang-dibutuhkan)
-4. [Software yang Dibutuhkan](#software-yang-dibutuhkan)
-5. [Cara Install](#cara-install)
-6. [Cara Penggunaan](#cara-penggunaan)
-7. [Struktur Folder](#struktur-folder)
-8. [Troubleshooting](#troubleshooting)
-9. [Kontributor](#kontributor)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![VESC](https://img.shields.io/badge/VESC-MC75-00B4D8?style=for-the-badge)
+![Shell Eco-marathon](https://img.shields.io/badge/Shell-Eco--marathon-FFD700?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Active%20Development-39FF14?style=for-the-badge)
+
+</div>
 
 ---
 
-## 🎯 TENTANG PROYEK
+## 📋 Table of Contents
 
-Sistem telemetri untuk kendaraan listrik berbasis ESP32 yang menampilkan data secara real-time di dashboard web. Cocok untuk aplikasi motorsport seperti skuter listrik, sepeda motor listrik, atau mobil listrik.
-
-**Tujuan:**
-- Memantau performa kendaraan secara langsung
-- Merekam data untuk analisis
-- Mendeteksi masalah sejak dini
-- Meningkatkan efisiensi kendaraan
-
----
-
-## ✨ FITUR
-
-### 📊 Data yang Dipantau
-| Data | Sumber | Satuan |
-|------|--------|--------|
-| Tegangan Baterai | PZEM-017 | Volt (V) |
-| Arus Listrik | PZEM-017 | Ampere (A) |
-| Daya Motor | PZEM-017 | Watt (W) |
-| Energi Total | PZEM-017 | Watt-hour (Wh) |
-| RPM Motor | VESC | RPM |
-| RPM Roda | VESC | RPM |
-| Kecepatan | VESC | km/h |
-| Suhu Motor | VESC | °C |
-| Suhu Controller | VESC | °C |
-| State of Charge | Kalkulasi | % |
-| Efisiensi Motor | Kalkulasi | % |
-
-### 🖥️ Fitur Dashboard
-- Tampilan ala F1 dengan animasi racing
-- Update data real-time (setiap 1 detik)
-- Grafik performa (Power, Speed, RPM)
-- Alert peringatan jika ada masalah
-- Penyimpanan data historis
-- Export data ke CSV
-- Lap counter otomatis
+- [Overview](#-overview)
+- [System Architecture](#-system-architecture)
+- [Modules](#-modules)
+  - [1. Telemetry EDA](#1-telemetry-eda)
+  - [2. Transfer Function Identification](#2-transfer-function-identification)
+  - [3. Genetic Algorithm Optimizer](#3-genetic-algorithm-optimizer)
+  - [4. Dijkstra / A* Path Planner](#4-dijkstra--a-path-planner)
+- [Hardware Setup](#-hardware-setup)
+- [Data Format](#-data-format)
+- [Results](#-results)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [Roadmap](#-roadmap)
 
 ---
 
-## 🔧 HARDWARE YANG DIBUTUHKAN
+## 🔍 Overview
 
-### **A. Komponen Utama (Wajib)**
-| No | Komponen | Spesifikasi | Fungsi | Harga |
-|----|----------|-------------|--------|-------|
-| 1 | ESP32 Board | ESP32-WROOM-32 | Mikrokontroler | Rp 75.000 |
-| 2 | PZEM-017 | DC Power Meter | Ukur tegangan/arus | Rp 250.000 |
-| 3 | VESC Controller | VESC4/6/6 | Kontroler motor | (sudah punya) |
-| 4 | Step-down DC-DC | LM2596 | Turunkan tegangan 60V ke 5V | Rp 20.000 |
-| 5 | Kabel Jumper | Male-Female | Koneksi komponen | Rp 25.000 |
+This project implements a complete offline optimization pipeline for a Shell Eco-marathon urban concept vehicle. The goal is to minimize **Wh/km** energy consumption by computing the optimal throttle profile for a known track, using real VESC telemetry data as both the training input and validation source.
 
-### **B. Sensor Tambahan (Opsional)**
-| No | Komponen | Fungsi | Harga |
-|----|----------|--------|-------|
-| 1 | GPS NEO-6M | Tracking posisi dan kecepatan | Rp 120.000 |
-| 2 | IMU MPU6050 | Ukur G-force dan sudut kemiringan | Rp 50.000 |
-| 3 | SD Card Module + Card | Backup data lokal | Rp 100.000 |
+The pipeline has four stages that feed into each other:
 
-**Total Budget:** Rp 370.000 - Rp 640.000
+```
+Raw VESC Telemetry (.csv)
+        │
+        ▼
+  ┌─────────────┐
+  │  EDA Module │  ── extract driving modes, KPIs, anomaly detection
+  └──────┬──────┘
+         │
+         ▼
+  ┌──────────────────────────┐
+  │  System Identification   │  ── step response → FOPDT transfer function
+  │  G(s) = K·e^(-Ls) /     │
+  │         (τ_e·s+1)(τ_m·s+1) │
+  └──────┬───────────────────┘
+         │  K, τ_e, τ_m, L
+         ▼
+  ┌─────────────────────────────┐
+  │  Genetic Algorithm          │  ── TF-constrained throttle profile
+  │  minimize: Wh/km            │     optimization over N gene segments
+  │  s.t. v_avg ≥ 10 km/h      │
+  │       v_max ≤ 45 km/h      │
+  └──────┬──────────────────────┘
+         │  optimal_profile[N]
+         ▼
+  ┌─────────────────────────────┐
+  │  Dijkstra / A* Path Planner │  ── per-segment speed limits from
+  │  min energy path on graph   │     GPS track geometry
+  └──────┬──────────────────────┘
+         │
+         ▼
+  VESC duty_cycle lookup table
+  + PID correction (Kp=0.025, Ti=2.64s)
+```
 
 ---
 
-## 💻 SOFTWARE YANG DIBUTUHKAN
+## 🏗 System Architecture
 
-### **A. Aplikasi yang Harus Diinstall**
-| Software | Fungsi | Link Download |
-|----------|--------|---------------|
-| Arduino IDE | Untuk programming ESP32 | [Download](https://www.arduino.cc/en/software) |
-| Node.js | Untuk menjalankan server | [Download](https://nodejs.org) |
-| InfluxDB | Database untuk nyimpen data | [Download](https://portal.influxdata.com/downloads/) |
-| Git | Untuk clone repository | [Download](https://git-scm.com/downloads) |
+```
+sem-driveline-optimizer/
+│
+├── data/
+│   ├── raw/                    # Raw VESC .csv exports
+│   │   ├── 351_GBT_MC75.csv    # Session 1 (no GPS)
+│   │   └── 2026-02-22_*.csv    # Session 2 (GPS active, 6 laps)
+│   └── processed/
+│       ├── timeseries.json     # Downsampled telemetry
+│       ├── gps_track.json      # Cleaned GPS waypoints
+│       ├── track_graph.json    # Graph nodes + edges
+│       ├── tf_results.json     # Transfer function parameters
+│       └── ga_results.json     # GA optimization output
+│
+├── modules/
+│   ├── eda/
+│   │   └── telemetry_eda.py    # Exploratory data analysis
+│   ├── sysid/
+│   │   └── transfer_function.py # Step response + TF identification
+│   ├── optimizer/
+│   │   └── genetic_algorithm.py # GA with TF-based vehicle simulator
+│   └── pathplanner/
+│       ├── graph_builder.py    # GPS → graph construction
+│       └── dijkstra_astar.py   # Pathfinding algorithms
+│
+├── dashboards/                 # Interactive HTML outputs
+│   ├── telemetry_eda.html
+│   ├── transfer_function.html
+│   ├── ga_optimizer.html
+│   └── track_pathfinder.html
+│
+├── tests/
+│   └── test_simulator.py
+│
+├── requirements.txt
+└── README.md
+```
 
-### **B. Library Arduino**
-Install library ini melalui Arduino IDE (Sketch → Include Library → Manage Libraries):
+---
+
+## 📦 Modules
+
+### 1. Telemetry EDA
+
+**File:** `modules/eda/telemetry_eda.py`
+**Dashboard:** `dashboards/telemetry_eda.html`
+
+Parses raw VESC MC75 `.csv` logs and produces a full exploratory analysis.
+
+**Key outputs:**
+
+| Metric | Value (Session 2) |
+|---|---|
+| Duration | 21.2 min |
+| Distance | 1,081 m |
+| Peak speed | 35.9 km/h |
+| Peak power | 809 W |
+| Avg active power | 543 W |
+| Max MOSFET temp | 34.3 °C |
+| GPS fix | ✅ Active (hAcc 1.5–6.0m) |
+
+**Driving mode segmentation** (auto-detected from speed + duty thresholds):
+
+```
+STOPPED      ████████████████████████░  86%
+ACCELERATING ██░                         13%
+COASTING     ░                            1%
+```
+
+**Detected anomalies:**
+- Battery level starts at `0`, jumps to `0.423` at sample 2 → BMS/VESC init delay, safe to discard first 2 rows
+- `gnss_posTime = -1` in Session 1 → GPS module not locked, all lat/lon = 0
+
+---
+
+### 2. Transfer Function Identification
+
+**File:** `modules/sysid/transfer_function.py`
+**Dashboard:** `dashboards/transfer_function.html`
+
+Identifies the vehicle plant model from step-response acceleration events using the **two-point method** on FOPDT (First Order Plus Dead Time).
+
+#### Identified Model
+
+```
+                    37.61 · e^(-0.1s)
+G_plant(s) = ─────────────────────────────────
+                  (0.1s + 1)(2.64s + 1)
+```
+
+| Parameter | Value | Physical Meaning |
+|---|---|---|
+| **K** | 37.61 m/s | DC gain — max steady-state speed at duty=1.0 |
+| **τ_e** | 0.10 s | Electrical time constant (motor + ESC) |
+| **τ_m** | 2.64 s | Mechanical time constant (vehicle inertia) |
+| **L** | 0.10 s | Transport / sensor delay |
+| **L/τ_m** | 0.076 | Controllability ratio — excellent (<0.3) |
+
+#### Subsystems
+
+```
+Electrical:   G_e(s) = 27,291 / (0.1s + 1)         [ERPM/duty]
+Mechanical:   G_m(s) = 37.61·e^(-0.1s) / (2.64s+1) [m/s per duty]
+Combined:     G(s)   = G_e(s) · G_m(s)
+```
+
+#### PID Tuning (Recommended: IMC)
+
+| Method | Kp | Ki | Kd | Ti |
+|---|---|---|---|---|
+| Ziegler-Nichols P | 0.3515 | — | — | — |
+| Ziegler-Nichols PI | 0.3164 | 0.4745 | — | 0.667s |
+| Ziegler-Nichols PID | 0.4218 | 1.0545 | 0.0422 | 0.400s |
+| **IMC (⭐ recommended)** | **0.0247** | **0.0093** | **—** | **2.644s** |
+
+> **Why IMC?** Smooth response, minimal overshoot, model-based. The low L/τ ratio (0.076) means aggressive PID is unnecessary.
+
+---
+
+### 3. Genetic Algorithm Optimizer
+
+**File:** `modules/optimizer/genetic_algorithm.py`
+**Dashboard:** `dashboards/ga_optimizer.html`
+
+Optimizes a throttle profile (sequence of duty cycle values) to minimize Wh/km, with the vehicle dynamics enforced via the identified transfer function.
+
+#### Problem Formulation
+
+```
+minimize    f(x) = Wh_total / distance_km
+
+subject to  v_avg(x) ≥ 10.0 km/h       (SEM minimum speed rule)
+            v_max(x) ≤ 45.0 km/h       (SEM urban track limit)
+            x_i ∈ [0.0, 1.0]           (duty cycle bounds)
+            |x_i - x_{i-1}| smooth     (TF constraint: τ_m = 2.64s)
+
+Fitness:    F(x) = f(x)
+                 + 500 · max(0, v_min − v_avg)²
+                 + 200 · max(0, v_max − v_lim)²
+                 + 3.0 · Σ (Δx_i)²
+```
+
+#### GA Configuration
+
+| Parameter | Value |
+|---|---|
+| Chromosome length (N_GENES) | 20 |
+| Segment duration | 10s each (200s total) |
+| Population size | 60 |
+| Generations | 100 |
+| Selection | Tournament (k=5) |
+| Crossover | Uniform + single-point |
+| Mutation rate | 0.15, σ=0.10 |
+| Elitism | 4 |
+
+#### Results
+
+| Strategy | Wh/km | v_avg | v_max | Feasible |
+|---|---|---|---|---|
+| Constant 30% duty | 2.935 | 88.9 km/h | 99.4 km/h | ❌ Too fast |
+| Constant 50% duty | 4.891 | 88.9 km/h | 99.4 km/h | ❌ Too fast |
+| Manual pulse-glide | 4.763 | 40.5 km/h | 99.4 km/h | ❌ Too fast |
+| **GA Optimized** | **1.671** | **10.2 km/h** | **37.3 km/h** | **✅** |
+
+> **43% improvement** vs constant 30% baseline. GA converged to a sustained low-throttle strategy (duty ≈ 0.05–0.10) — physically sensible given τ_m = 2.64s and 10s segment duration.
+
+#### Vehicle Simulator (core function)
+
+```python
+def simulate(chromosome, dt=0.5, K=37.61, tau_e=0.10, tau_m=2.64, L=0.10):
+    """
+    Euler integration of FOPDT plant model.
+    State equations:
+      dx1/dt = (K·u_delayed − x1) / tau_e   # electrical state
+      dx2/dt = (x1 − x2)         / tau_m   # speed (m/s)
+    """
+    delay_buf = [0.0] * max(1, int(L/dt))
+    x1 = x2 = 0.0
+    ...
+```
+
+---
+
+### 4. Dijkstra / A\* Path Planner
+
+**File:** `modules/pathplanner/dijkstra_astar.py`
+**Dashboard:** `dashboards/track_pathfinder.html`
+
+Builds a weighted graph from GPS track data and finds the minimum-energy path around the circuit.
+
+#### GPS Data Quality (Session 2)
+
+| Metric | Value |
+|---|---|
+| Valid GPS rows | 15,054 / 15,063 (99.9%) |
+| Unique fixes | 1,273 |
+| Update rate | ~1 Hz |
+| Horizontal accuracy | 1.5 – 6.0 m |
+| Location | Surabaya, East Java (lat -7.350, lon 112.790) |
+| Laps detected | 6 |
+
+#### Graph Construction
+
+```
+GPS waypoints (1 Hz)
+    │
+    ├── Filter: hAcc < 10m
+    ├── Deduplicate by posTime
+    ├── Detect lap boundaries (return to start, dist < 25m)
+    ├── Select cleanest lap
+    ├── Downsample: 1 node per 10m
+    └── Compute edge attributes per segment:
+            - distance (Haversine)
+            - elevation change (GPS alt)
+            - grade (rise/run)
+            - curvature (angle between consecutive segments)
+            - energy cost (physics model: rolling + aero + grade)
+```
+
+#### Energy Cost Model (per edge)
+
+```python
+F_roll  = Crr * m * g                       # rolling resistance
+F_drag  = 0.5 * rho * Cd_A * v²             # aerodynamic drag
+F_grade = m * g * grade                     # gravitational
+
+energy_Wh = (F_roll + F_drag + max(0, F_grade)) * dist / 3600
+```
+
+> Parameters: `m=80 kg`, `Crr=0.005`, `Cd_A=0.15 m²`, `rho=1.2 kg/m³`
+
+#### Track Summary
+
+| Metric | Value |
+|---|---|
+| Lap distance | 1,495.6 m |
+| Graph nodes | 113 |
+| Graph edges | 112 |
+| Sharp corners (>15°) | 7 |
+| Steep uphills (>2%) | 20 |
+| Elevation range | 32 – 41 m |
+| A* energy estimate | 7.65 Wh/lap |
+| A* efficiency | 5.11 Wh/km |
+
+#### A\* Heuristic
+
+```python
+def h(node):
+    # Admissible: minimum possible energy = pure rolling resistance
+    h_per_m = Crr * m * g / 3600   # Wh/m
+    return haversine(node, goal) * h_per_m
+```
+
+---
+
+## 🔧 Hardware Setup
+
+```
+┌─────────────────────────────────────────────┐
+│           Vehicle Electronics               │
+│                                             │
+│  Battery (60V LiPo)                         │
+│       │                                     │
+│       ▼                                     │
+│  VESC MC75  ──── UART ────  GPS Module      │
+│       │              (u-blox, 1Hz, NMEA)    │
+│       │                                     │
+│       ▼                                     │
+│  BLDC Motor                                 │
+│       │                                     │
+│       ▼                                     │
+│  Drivetrain → Rear wheel                    │
+│                                             │
+│  VESC Tool (PC/laptop) ── USB ── VESC       │
+│       └── Log: .csv export (55 columns)     │
+└─────────────────────────────────────────────┘
+```
+
+**VESC Settings for GPS logging:**
+1. `App Settings → GNSS` → enable, set UART port and baud rate to match GPS module
+2. `App Settings → IMU` → enable (for roll/pitch/yaw)
+3. Power on vehicle **5–10 minutes before** session for GPS cold-start fix
+4. Verify: `gnss_posTime > 0` and `gnss_lat != 0.0` before starting lap
+
+---
+
+## 📊 Data Format
+
+VESC MC75 exports semicolon-delimited `.csv` with 55 columns. Key columns used:
+
+| Column | Unit | Description |
+|---|---|---|
+| `ms_today` | ms | Timestamp |
+| `erpm` | ERPM | Electrical RPM |
+| `duty_cycle` | — | Throttle duty [-1, 1] |
+| `speed_meters_per_sec` | m/s | Calculated wheel speed |
+| `tacho_meters` | m | Odometer (cumulative) |
+| `current_in` | A | Battery current draw |
+| `watt_hours_used` | Wh | Cumulative energy used |
+| `input_voltage` | V | Battery voltage |
+| `temp_mos_max` | °C | Peak MOSFET temperature |
+| `gnss_lat` | deg | GPS latitude |
+| `gnss_lon` | deg | GPS longitude |
+| `gnss_alt` | m | GPS altitude |
+| `gnss_hAcc` | m | Horizontal accuracy |
+| `gnss_posTime` | ms | GPS fix timestamp (-1 = no fix) |
+
+---
+
+## 📈 Results
+
+### End-to-End Pipeline Output
+
+```
+Input:   Raw VESC telemetry, 6 laps, Surabaya track
+Output:  Optimal duty_cycle[20] lookup table
+
+┌────────────────────────────────────────────┐
+│  GA Optimal Profile                        │
+│  eff = 1.671 Wh/km                        │
+│  v_avg = 10.2 km/h  ✓ (≥ 10)             │
+│  v_max = 37.3 km/h  ✓ (≤ 45)             │
+│                                            │
+│  Chromosome:                               │
+│  [0.08, 0.00, 0.04, 0.00, 0.08, 0.10,    │
+│   0.05, 0.01, 0.01, 0.00, 0.01, 0.01,    │
+│   0.03, 0.00, 0.00, 0.04, 0.01, 0.05,    │
+│   0.08, 0.01]                             │
+└────────────────────────────────────────────┘
+
+PID Correction Layer:
+  Kp = 0.0247  |  Ti = 2.644s  |  Ki = 0.0093
+  Setpoint = profile[segment_index] * K (m/s)
+  Output   = duty_cycle command to VESC
+```
+
+### VESC Integration
+
+```python
+# Pseudo-code for onboard implementation
+import time
+
+PROFILE = [0.082, 0.000, 0.040, ...]  # 20 genes
+SEGMENT_DURATION = 10.0               # seconds
+Kp, Ti = 0.0247, 2.644
+
+lap_start = time.time()
+integral = 0.0
+
+while racing:
+    seg = int((time.time() - lap_start) / SEGMENT_DURATION) % 20
+    setpoint = PROFILE[seg] * 37.61   # m/s target from GA
+
+    error = setpoint - vesc.get_speed()
+    integral += error / Ti
+    duty = Kp * (error + integral)
+
+    vesc.set_duty(max(0, min(1, duty)))
+```
+
+---
+
+## 🚀 Installation
+
+```bash
+# Clone repository
+git clone https://github.com/your-username/sem-driveline-optimizer.git
+cd sem-driveline-optimizer
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+**`requirements.txt`**
+```
+numpy>=1.24
+pandas>=2.0
+matplotlib>=3.7
+scipy>=1.10
+```
+
+---
+
+## 💻 Usage
+
+### Run full pipeline
+
+```bash
+# Step 1 — EDA
+python modules/eda/telemetry_eda.py --input data/raw/2026-02-22_01-25-41.csv
+
+# Step 2 — Transfer function identification
+python modules/sysid/transfer_function.py --input data/raw/351_GBT_MC75.csv
+
+# Step 3 — GA optimization
+python modules/optimizer/genetic_algorithm.py \
+    --tf-params data/processed/tf_results.json \
+    --v-min 10 --v-max 45 \
+    --generations 100 --pop 60
+
+# Step 4 — Path planning
+python modules/pathplanner/dijkstra_astar.py \
+    --input data/raw/2026-02-22_01-25-41.csv \
+    --node-spacing 10 \
+    --algorithm astar
+```
+
+### Open dashboards
+
+All dashboards are standalone `.html` files — open in any browser:
+
+```
+dashboards/
+├── telemetry_eda.html       ← EDA: speed, power, thermal, energy KPIs
+├── transfer_function.html   ← Bode plot, step response, PID tuning
+├── ga_optimizer.html        ← Convergence, chromosome, strategy comparison
+└── track_pathfinder.html    ← GPS map (Canvas), speed profile, segment analysis
+```
+
+---
+
+## 🗺 Roadmap
+
+- [x] VESC telemetry parser & EDA dashboard
+- [x] Transfer function identification (FOPDT, two-point method)
+- [x] PID tuning (IMC, Ziegler-Nichols)
+- [x] GA throttle optimizer with TF-based vehicle simulator
+- [x] GPS track extraction & lap detection
+- [x] Graph construction (Haversine + elevation + curvature)
+- [x] Dijkstra & A* pathfinding (min energy)
+- [x] Interactive HTML dashboards (no external dependencies)
+- [ ] Integrate A* per-segment speed limits into GA constraints
+- [ ] NSGA-II multi-objective (Wh/km + thermal + battery SoH)
+- [ ] IMU integration (roll/pitch/yaw) for cornering dynamics
+- [ ] Online replanning with live GPS feed
+- [ ] VESC firmware integration (CAN bus duty lookup table)
+- [ ] Neural network surrogate model for faster GA fitness evaluation
+
+---
+
+## 📁 Dashboards Preview
+
+| Dashboard | Description |
+|---|---|
+| `telemetry_eda.html` | 4-tab EDA: time-series, energy, driving modes, KPI cards |
+| `transfer_function.html` | 5-tab: plant model, step fit, Bode plot, PID table, closed-loop sim |
+| `ga_optimizer.html` | 5-tab: overview, convergence, chromosome visualizer, strategy compare, Python code |
+| `track_pathfinder.html` | 3-tab: Canvas GPS map (zoom/pan/hover), speed profile, segment analysis table |
+
+---
+
+## 🤝 Contributing
+
+Pull requests welcome. For major changes, open an issue first to discuss what you'd like to change.
+
+---
+
+## 📄 License
+
+MIT License — see [LICENSE](LICENSE) for details.
+
+---
+
+<div align="center">
+<sub>Built for Shell Eco-marathon competition · VESC MC75 · Surabaya, Indonesia</sub>
+</div>
