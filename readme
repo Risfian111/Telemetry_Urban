@@ -1,0 +1,96 @@
+# 🏎️ MOTORSPORT TELEMETRY SYSTEM
+### ESP32-Based Real-Time Racing Dashboard
+
+![Version](https://img.shields.io/badge/version-2.0-red)
+![ESP32](https://img.shields.io/badge/platform-ESP32-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
+## 📋 DAFTAR ISI
+1. [Tentang Proyek](#tentang-proyek)
+2. [Fitur](#fitur)
+3. [Hardware yang Dibutuhkan](#hardware-yang-dibutuhkan)
+4. [Software yang Dibutuhkan](#software-yang-dibutuhkan)
+5. [Cara Install](#cara-install)
+6. [Cara Penggunaan](#cara-penggunaan)
+7. [Struktur Folder](#struktur-folder)
+8. [Troubleshooting](#troubleshooting)
+9. [Kontributor](#kontributor)
+
+---
+
+## 🎯 TENTANG PROYEK
+
+Sistem telemetri untuk kendaraan listrik berbasis ESP32 yang menampilkan data secara real-time di dashboard web. Cocok untuk aplikasi motorsport seperti skuter listrik, sepeda motor listrik, atau mobil listrik.
+
+**Tujuan:**
+- Memantau performa kendaraan secara langsung
+- Merekam data untuk analisis
+- Mendeteksi masalah sejak dini
+- Meningkatkan efisiensi kendaraan
+
+---
+
+## ✨ FITUR
+
+### 📊 Data yang Dipantau
+| Data | Sumber | Satuan |
+|------|--------|--------|
+| Tegangan Baterai | PZEM-017 | Volt (V) |
+| Arus Listrik | PZEM-017 | Ampere (A) |
+| Daya Motor | PZEM-017 | Watt (W) |
+| Energi Total | PZEM-017 | Watt-hour (Wh) |
+| RPM Motor | VESC | RPM |
+| RPM Roda | VESC | RPM |
+| Kecepatan | VESC | km/h |
+| Suhu Motor | VESC | °C |
+| Suhu Controller | VESC | °C |
+| State of Charge | Kalkulasi | % |
+| Efisiensi Motor | Kalkulasi | % |
+
+### 🖥️ Fitur Dashboard
+- Tampilan ala F1 dengan animasi racing
+- Update data real-time (setiap 1 detik)
+- Grafik performa (Power, Speed, RPM)
+- Alert peringatan jika ada masalah
+- Penyimpanan data historis
+- Export data ke CSV
+- Lap counter otomatis
+
+---
+
+## 🔧 HARDWARE YANG DIBUTUHKAN
+
+### **A. Komponen Utama (Wajib)**
+| No | Komponen | Spesifikasi | Fungsi | Harga |
+|----|----------|-------------|--------|-------|
+| 1 | ESP32 Board | ESP32-WROOM-32 | Mikrokontroler | Rp 75.000 |
+| 2 | PZEM-017 | DC Power Meter | Ukur tegangan/arus | Rp 250.000 |
+| 3 | VESC Controller | VESC4/6/6 | Kontroler motor | (sudah punya) |
+| 4 | Step-down DC-DC | LM2596 | Turunkan tegangan 60V ke 5V | Rp 20.000 |
+| 5 | Kabel Jumper | Male-Female | Koneksi komponen | Rp 25.000 |
+
+### **B. Sensor Tambahan (Opsional)**
+| No | Komponen | Fungsi | Harga |
+|----|----------|--------|-------|
+| 1 | GPS NEO-6M | Tracking posisi dan kecepatan | Rp 120.000 |
+| 2 | IMU MPU6050 | Ukur G-force dan sudut kemiringan | Rp 50.000 |
+| 3 | SD Card Module + Card | Backup data lokal | Rp 100.000 |
+
+**Total Budget:** Rp 370.000 - Rp 640.000
+
+---
+
+## 💻 SOFTWARE YANG DIBUTUHKAN
+
+### **A. Aplikasi yang Harus Diinstall**
+| Software | Fungsi | Link Download |
+|----------|--------|---------------|
+| Arduino IDE | Untuk programming ESP32 | [Download](https://www.arduino.cc/en/software) |
+| Node.js | Untuk menjalankan server | [Download](https://nodejs.org) |
+| InfluxDB | Database untuk nyimpen data | [Download](https://portal.influxdata.com/downloads/) |
+| Git | Untuk clone repository | [Download](https://git-scm.com/downloads) |
+
+### **B. Library Arduino**
+Install library ini melalui Arduino IDE (Sketch → Include Library → Manage Libraries):
